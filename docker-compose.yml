@@ -1,0 +1,75 @@
+
+
+services:
+
+  mysql-cf:
+    image: mysql:8
+    container_name: mysql-cf
+    environment:
+      MYSQL_DATABASE: symfony
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: chatfix1234
+      MYSQL_PASSWORD: chatfix
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - cf-network
+
+
+  symfony-backend-cf:
+    build: ./backend
+    container_name: symfony-backend-cf
+    volumes:
+      - ./backend:/var/www/chatFix
+      - ./backend/config/jwt:/var/www/chatFix/config/jwt 
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: 1
+      DATABASE_URL: "mysql://root:root@mysql-cf:3306/symfony?serverVersion=8.0"
+      JWT_SECRET_KEY: "/var/www/chatFix/config/jwt/private.pem"
+      JWT_PUBLIC_KEY: "/var/www/chatFix/config/jwt/public.pem"
+
+      JWT_PASSPHRASE: ""  
+    ports:
+      - "9010:9000"
+    networks:
+      - cf-network
+
+  react-frontend-cf:
+    build:
+      context: ./frontend
+    container_name: react-frontend-cf
+    working_dir: /app
+    command: ["npm", "start"]
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+    ports:
+      - "3010:3000"   # tu peux changer 3010 si tu veux un autre port côté hôte
+    stdin_open: true
+    tty: true
+    networks:
+      - cf-network
+
+
+  nginx-cf:
+    image: nginx:stable
+    container_name: nginx-cf
+    ports:
+      - "8081:80"
+    volumes:
+      - ./backend/public:/var/www/chatFix/public
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - symfony-backend-cf
+      - react-frontend-cf
+    networks:
+      - cf-network
+
+networks:
+  cf-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
